@@ -1,15 +1,25 @@
-#define GLEW_STATIC
+// OpenGL headers
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <ft2build.h>
 #include <freetype/freetype.h>
+
+// standard headers
+
 #include <map>
-#define FT_FREETYPE_H 
+#include <string>
+#include <iostream>
+
+// macros
+
+#define GLEW_STATIC
+#define FT_FREETYPE_H
 #define r glm::radians
+#define VSYNC 1
 
 //use imgui for camera position, slider for fov, reset button, and collision detection message.
 
@@ -29,8 +39,6 @@ glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
 // Frame timing
-GLfloat deltaTime = 0.0f;
-GLfloat lastFrame = 0.0f;
 
 // mouse movement callback
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
@@ -65,7 +73,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void do_movement(GLFWwindow* window)
 {
     // Camera controls
-    GLfloat cameraSpeed = 5.0f * deltaTime;
+    GLfloat cameraSpeed = 0.10f;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         cameraPos += cameraSpeed * cameraFront;
     }
@@ -352,24 +360,54 @@ int main()
     FT_Done_Face(face);
     FT_Done_FreeType(ft);
 
+    glEnable(GL_CULL_FACE);
+
+    glCullFace(GL_BACK);       // more commonly gl_front for culling
+    glFrontFace(GL_CCW);  //! front face is counter clockwise always. back is cw.
+
+    // above says cull back faces, and front face is counter clockwise.
+
+    double prevTime = 0.0;
+    double currTime = 0.0;
+    double TimeDiff = 0.0;
+    unsigned int counter = 0;
+
+    std::string gpu = (char*)glGetString(GL_RENDERER);
+
     while (!glfwWindowShouldClose(window) && !glfwGetKey(window, GLFW_KEY_ESCAPE))
     {
-        // delta time
-        GLfloat currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
 
-        // Check and call events
-        glfwPollEvents();   //!!!!!!!!!
-        do_movement(window);
+        #ifdef VSYNC
+        glfwSwapInterval(1);    // vsync for not 90% gpu usage
+        #else
+        glfwSwapInterval(0);    // vsync
+        #endif // VSYNC
+
+        // delta time
+        GLfloat currTime = glfwGetTime();
+        TimeDiff = currTime - prevTime;
+        ++counter;
+
+        if (TimeDiff >= 1.0 / 30)   // 33ms/30fps   
+        {
+			std::string FPS = std::to_string((1.0/TimeDiff)*counter);
+            std::string ms = std::to_string((TimeDiff/counter)*1000);
+            std::string title = "OpenGL | " + FPS + " FPS | " + ms + " ms | " + (VSYNC ? "VSYNC ON" : "VSYNC OFF") + " | " + gpu;
+            glfwSetWindowTitle(window, title.c_str());
+            prevTime = currTime;
+            counter = 0;
+		}
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glUseProgram(shaderProgram);
 
-        glfwSwapInterval(1);    // vsync for not 90% gpu usage
         glEnable(GL_DEPTH_TEST);
+
+        // Check and call events
+        glfwPollEvents();   //!!!!!!!!!
+        do_movement(window);
 
         // Camera/view transformation
         glm::mat4 view;
